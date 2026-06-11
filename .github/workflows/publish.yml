@@ -26,16 +26,8 @@ jobs:
       - name: Build
         run: npm run build
 
-      # BOOTSTRAP (first publish only): npm won't let you configure a Trusted
-      # Publisher for a package that doesn't exist yet, so 0.1.0 publishes with a
-      # short-lived NPM_TOKEN repo secret. After it lands: add the Trusted
-      # Publisher on npmjs.com (repo Particle-Academy/fancy-term, workflow
-      # publish.yml), revoke the token, and delete the `env: NODE_AUTH_TOKEN`
-      # line below — every subsequent release then publishes via OIDC.
-      #
-      # Trusted Publishing OIDC needs npm 11.5+; the runner ships npm 10, so we
+      # Trusted Publishing (OIDC) — no token. Configured on npmjs.com after the
+      # 0.1.0 bootstrap. OIDC needs npm 11.5+; the runner ships npm 10, so we
       # fetch a fresh npm via npx just for the publish.
       - name: Publish
         run: npx -y npm@latest publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
