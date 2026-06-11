@@ -7,6 +7,27 @@ export type TerminalTheme = ITheme;
 export type CursorStyle = "block" | "underline" | "bar";
 
 /**
+ * A selectable shell / profile. Fully JSON-friendly (primitives only) so an agent
+ * can emit it. fancy-term owns the *selected-shell state + UI + events*; the
+ * `command` / `args` / `cwd` fields are **host hints** — fancy-term never spawns a
+ * shell, the host reconnects its PTY/command backend to the chosen profile.
+ */
+export interface ShellProfile {
+  /** Stable key, e.g. `"powershell"`. */
+  id: string;
+  /** Display label, e.g. `"PowerShell"`. */
+  label: string;
+  /** Optional short glyph / emoji / single char (kept JSON-friendly — no ReactNode). */
+  icon?: string;
+  /** Host hint — the executable, e.g. `"pwsh"` / `"cmd.exe"`. */
+  command?: string;
+  /** Host hint — launch args. */
+  args?: string[];
+  /** Host hint — working directory. */
+  cwd?: string;
+}
+
+/**
  * Imperative handle exposed via the `<Terminal>` ref and returned by
  * {@link useTerminal}. The same surface an MCP bridge drives so an embedded
  * agent reads the buffer + writes input without DOM-scraping.
@@ -30,6 +51,14 @@ export interface TerminalHandle {
   getBuffer: () => string;
   /** The current text selection, or "" when nothing is selected. */
   getSelection: () => string;
+  /**
+   * Switch the active shell by id. Resolves the matching {@link ShellProfile}
+   * from `shells` and fires `onShellChange`; in uncontrolled mode it also updates
+   * the internal selection. No-op when the id isn't in `shells`.
+   */
+  setShell: (id: string) => void;
+  /** The active shell id, or `undefined` when no shell is selected. */
+  getShell: () => string | undefined;
 }
 
 /** Engine options shared by `<Terminal>` and {@link useTerminal}. */
@@ -69,4 +98,52 @@ export interface TerminalProps extends TerminalOptions, Omit<HTMLAttributes<HTML
    * `useFancyStream`. Replacing it with a non-extending string resets + rewrites.
    */
   output?: string;
+
+  /**
+   * The shells / profiles a host offers. fancy-term renders the selector and
+   * tracks the choice; the host reacts (reconnects its PTY to the chosen shell).
+   * Spread {@link BUILTIN_SHELLS} for sensible presets, but the host owns the list.
+   */
+  shells?: ShellProfile[];
+  /** Controlled active-shell id. Omit for uncontrolled (internal) selection. */
+  activeShell?: string;
+  /** Fired when the user (or `setShell`) switches shells. */
+  onShellChange?: (id: string, profile: ShellProfile) => void;
+  /**
+   * Render the built-in `<ShellSwitcher>` toolbar above the xterm surface when
+   * `shells` is provided. Default `false` — opt-in so existing layout is unchanged.
+   */
+  showShellBar?: boolean;
 }
+
+/**
+ * Resolve a shell id to its {@link ShellProfile} within a list. Pure helper —
+ * the single place `setShell` / `<ShellSwitcher>` / the session hook agree on
+ * what "switch to id X" means.
+ */
+export function resolveShell(
+  shells: ShellProfile[] | undefined,
+  id: string | undefined,
+): ShellProfile | undefined {
+  if (!shells || id === undefined) return undefined;
+  return shells.find((s) => s.id === id);
+}
+
+/**
+ * A small set of sensible built-in shell presets a host can spread / filter.
+ * `command` / `args` are host hints only — fancy-term never spawns them.
+ */
+export const BUILTIN_SHELLS: readonly ShellProfile[] = [
+  { id: "cmd", label: "Command Prompt", icon: ">_", command: "cmd.exe" },
+  { id: "powershell", label: "Windows PowerShell", icon: "PS", command: "powershell.exe" },
+  { id: "pwsh", label: "PowerShell", icon: "PS", command: "pwsh" },
+  {
+    id: "git-bash",
+    label: "Git Bash",
+    icon: "",
+    command: "C:\\Program Files\\Git\\bin\\bash.exe",
+    args: ["--login", "-i"],
+  },
+  { id: "bash", label: "Bash", icon: "$", command: "bash" },
+  { id: "zsh", label: "Zsh", icon: "%", command: "zsh" },
+] as const;

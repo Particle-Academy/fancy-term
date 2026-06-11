@@ -57,6 +57,11 @@ export function useTerminal(
       focus: () => xtermRef.current?.focus(),
       getBuffer: () => readBuffer(xtermRef.current),
       getSelection: () => xtermRef.current?.getSelection() ?? "",
+      // Shell selection is owned by the <Terminal> component layer (it needs the
+      // `shells` list + onShellChange). The headless engine is shell-agnostic, so
+      // these are no-ops here and get overridden when <Terminal> composes them.
+      setShell: () => {},
+      getShell: () => undefined,
     };
   }
   const handle = handleRef.current;

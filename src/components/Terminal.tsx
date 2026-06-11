@@ -1,6 +1,15 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import { useTerminal } from "../hooks/use-terminal";
+import { ShellSwitcher } from "./ShellSwitcher";
 import { diffOutput } from "../output-diff";
+import { decideShellSelect } from "../shell-select";
 import type { TerminalHandle, TerminalProps } from "../types";
 
 /**
@@ -38,6 +47,10 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     initialOutput,
     onData,
     onResize,
+    shells,
+    activeShell,
+    onShellChange,
+    showShellBar = false,
     className,
     style,
     ...rest
@@ -45,6 +58,23 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Selected shell: controlled by `activeShell` when provided, else internal.
+  const isShellControlled = activeShell !== undefined;
+  const [internalShell, setInternalShell] = useState<string | undefined>(undefined);
+  const shellId = isShellControlled ? activeShell : internalShell;
+
+  // Read shell state live so the stable handle's setShell/getShell never go stale.
+  const shellStateRef = useRef({ shells, shellId, isShellControlled, onShellChange });
+  shellStateRef.current = { shells, shellId, isShellControlled, onShellChange };
+
+  const selectShell = useCallback((id: string) => {
+    const s = shellStateRef.current;
+    const decision = decideShellSelect(s.shells, s.shellId, id);
+    if (!decision) return; // unknown id — no-op
+    if (!s.isShellControlled) setInternalShell(id);
+    s.onShellChange?.(id, decision.profile);
+  }, []);
 
   const handle = useTerminal(containerRef, {
     theme,
@@ -64,7 +94,15 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     onResize,
   });
 
-  useImperativeHandle(ref, () => handle, [handle]);
+  useImperativeHandle(
+    ref,
+    (): TerminalHandle => ({
+      ...handle,
+      setShell: selectShell,
+      getShell: () => shellStateRef.current.shellId,
+    }),
+    [handle, selectShell],
+  );
 
   // Controlled output: write only the appended delta; reset + rewrite if the
   // value diverges from what we've already written (a wholesale replace).
@@ -78,14 +116,49 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     written.current = output;
   }, [output, handle]);
 
-  return (
+  const surface = (
     <div
       ref={containerRef}
       data-fancy-terminal=""
       data-readonly={readOnly ? "" : undefined}
-      className={className}
-      style={{ width: "100%", height: "100%", ...style }}
-      {...rest}
+      data-fancy-terminal-shell={shellId ?? undefined}
+      // When the shell bar is shown the wrapper owns the box; the surface flexes.
+      style={
+        showShellBar && shells
+          ? { width: "100%", flex: 1, minHeight: 0 }
+          : { width: "100%", height: "100%", ...style }
+      }
+      {...(showShellBar && shells ? {} : rest)}
     />
+  );
+
+  if (!showShellBar || !shells) return surface;
+
+  return (
+    <div
+      data-fancy-terminal-shell={shellId ?? undefined}
+      className={className}
+      style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", ...style }}
+      {...rest}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "4px 6px",
+          background: "#09090b",
+          borderBottom: "1px solid #27272a",
+        }}
+      >
+        <ShellSwitcher
+          shells={shells}
+          value={shellId}
+          onChange={(id) => selectShell(id)}
+          disabled={readOnly}
+        />
+      </div>
+      {surface}
+    </div>
   );
 });
