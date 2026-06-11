@@ -48,8 +48,26 @@ export function useTerminal(
       clear: () => xtermRef.current?.clear(),
       reset: () => xtermRef.current?.reset(),
       fit: () => {
+        const addon = fitRef.current;
+        if (!addon) return;
         try {
-          fitRef.current?.fit();
+          // Guard against an unmeasurable container / not-yet-rendered viewport:
+          // proposeDimensions() returns undefined (or NaN) then, and fit() would
+          // call xterm's resize(undefined,…), which console-errors "cols must be
+          // numeric". Skip — the ResizeObserver fires again once it's measurable.
+          // This matters most under `showShellBar`, whose extra layout pass races
+          // the first fit.
+          const dims = addon.proposeDimensions();
+          if (
+            !dims ||
+            !Number.isFinite(dims.cols) ||
+            !Number.isFinite(dims.rows) ||
+            dims.cols < 1 ||
+            dims.rows < 1
+          ) {
+            return;
+          }
+          addon.fit();
         } catch {
           /* container not measurable yet — ignore */
         }
@@ -96,13 +114,9 @@ export function useTerminal(
     );
 
     if (o.initialOutput) term.write(o.initialOutput);
-    if ((o.fit ?? true) && el.clientWidth > 0 && el.clientHeight > 0) {
-      try {
-        fitAddon.fit();
-      } catch {
-        /* ignore */
-      }
-    }
+    // Route through the guarded handle.fit() (proposeDimensions check) so a
+    // not-yet-laid-out container never triggers an xterm resize(undefined).
+    if (o.fit ?? true) handle.fit();
 
     return () => {
       dataSub.dispose();
