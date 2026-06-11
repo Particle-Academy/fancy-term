@@ -1,6 +1,6 @@
 {
   "name": "@particle-academy/fancy-term",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Human+ Terminal for React — a controlled, themeable <Terminal> wrapping xterm.js, with hooks and an MCP-bridgeable surface so embedded agents read the buffer, write input, and run commands without DOM-scraping.",
   "repository": {
     "type": "git",

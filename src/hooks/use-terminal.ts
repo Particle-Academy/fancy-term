@@ -92,8 +92,11 @@ export function useTerminal(
 
     const term = new XTerm({
       theme: o.theme ?? fancyDarkTheme,
-      rows: o.rows,
-      cols: o.cols,
+      // Only pass rows/cols when explicitly set. xterm validates these and
+      // console-errors "rows/cols must be numeric" if handed `undefined`, rather
+      // than falling back to its 80×24 default. Omit the keys instead.
+      ...(typeof o.rows === "number" ? { rows: o.rows } : {}),
+      ...(typeof o.cols === "number" ? { cols: o.cols } : {}),
       disableStdin: o.readOnly ?? false,
       cursorBlink: o.cursorBlink ?? true,
       cursorStyle: o.cursorStyle ?? "block",
