@@ -3,6 +3,8 @@ import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { fancyDarkTheme } from "../theme";
 import { useTerminalFit } from "./use-terminal-fit";
+import { readClipboardText, readDataTransfer, writeClipboardText } from "../clipboard";
+import { shouldCopyEvent } from "../copy-keybinding";
 import type { TerminalHandle, TerminalOptions } from "../types";
 
 const DEFAULT_FONT =
@@ -75,6 +77,17 @@ export function useTerminal(
       focus: () => xtermRef.current?.focus(),
       getBuffer: () => readBuffer(xtermRef.current),
       getSelection: () => xtermRef.current?.getSelection() ?? "",
+      copySelection: async () => {
+        const sel = xtermRef.current?.getSelection() ?? "";
+        if (!sel) return false;
+        return writeClipboardText(sel);
+      },
+      paste: async (text) => {
+        const data = text ?? (await readClipboardText());
+        if (data) xtermRef.current?.paste(data);
+      },
+      selectAll: () => xtermRef.current?.selectAll(),
+      clearSelection: () => xtermRef.current?.clearSelection(),
       // Shell selection is owned by the <Terminal> component layer (it needs the
       // `shells` list + onShellChange). The headless engine is shell-agnostic, so
       // these are no-ops here and get overridden when <Terminal> composes them.
@@ -116,12 +129,43 @@ export function useTerminal(
       optsRef.current.onResize?.({ cols, rows }),
     );
 
+    // ── Clipboard wiring (gated by `clipboard !== false`, read live) ──────────
+    // Copy: Ctrl+Shift+C / Cmd+C-with-selection → system clipboard. Returning
+    // false consumes the event so no control byte is sent; plain Ctrl+C is never
+    // matched (stays SIGINT — see shouldCopyEvent).
+    term.attachCustomKeyEventHandler((e) => {
+      if (optsRef.current.clipboard === false) return true;
+      if (shouldCopyEvent(e, term.hasSelection())) {
+        void writeClipboardText(term.getSelection());
+        return false;
+      }
+      return true;
+    });
+
+    // Paste: a capture-phase listener on the container runs before xterm's own
+    // textarea handler. We do NOT preventDefault for text, so xterm pastes it
+    // exactly once natively — we only surface the payload (esp. pasted images)
+    // via onPaste. The host returning false (or a read-only terminal) suppresses
+    // the native text paste.
+    const onPasteEvent = (e: ClipboardEvent) => {
+      const o2 = optsRef.current;
+      if (o2.clipboard === false) return;
+      if (o2.readOnly) {
+        e.preventDefault();
+        return;
+      }
+      const payload = readDataTransfer(e.clipboardData);
+      if (o2.onPaste?.(payload) === false) e.preventDefault();
+    };
+    el.addEventListener("paste", onPasteEvent, true);
+
     if (o.initialOutput) term.write(o.initialOutput);
     // Route through the guarded handle.fit() (proposeDimensions check) so a
     // not-yet-laid-out container never triggers an xterm resize(undefined).
     if (o.fit ?? true) handle.fit();
 
     return () => {
+      el.removeEventListener("paste", onPasteEvent, true);
       dataSub.dispose();
       resizeSub.dispose();
       term.dispose();

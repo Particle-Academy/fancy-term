@@ -77,6 +77,9 @@ fancy-query's `useFancyStream`.
 | `activeShell` | `string` | controlled selected shell id (omit for uncontrolled) |
 | `onShellChange` | `(id, profile) => void` | fired when the user / `setShell` switches |
 | `showShellBar` | `boolean` | render the `<ShellSwitcher>` toolbar above the surface (default `false`) |
+| `clipboard` | `boolean` | enable the copy chord + paste interceptor (default `true`) |
+| `onPaste` | `(payload) => void \| boolean` | every paste; receives `{ text, files, images }` — handle pasted **images** here. Return `false` to suppress the native text paste |
+| `contextMenu` | `false \| Item[] \| (ctx, defaults) => Item[]` | the right-click selection menu (see [Clipboard & context menu](#clipboard--context-menu)) |
 
 The ref exposes a `TerminalHandle`:
 
@@ -85,10 +88,55 @@ const term = useRef<TerminalHandle>(null);
 // term.current.write / writeln / clear / reset / fit / focus
 // term.current.getBuffer()      → the visible buffer as text (what an agent "sees")
 // term.current.getSelection()   → current selection
+// term.current.copySelection()  → copy the selection to the system clipboard (Promise<boolean>)
+// term.current.paste(text?)     → paste text (or the system clipboard) into the terminal
+// term.current.selectAll() / clearSelection()
 // term.current.setShell("pwsh") → switch the active shell (fires onShellChange)
 // term.current.getShell()       → the active shell id
 // term.current.xterm            → the raw xterm.js instance (escape hatch)
 ```
+
+## Clipboard & context menu
+
+**Copy** — select text, then **Ctrl+Shift+C** (Windows/Linux) or **Cmd+C** (macOS,
+with a selection) copies to the system clipboard. Plain **Ctrl+C** is never
+intercepted — it stays **SIGINT**.
+
+**Paste** — text pastes natively. **Images** can't render in a shell, so a pasted
+image is handed to you via `onPaste` to upload / feed an agent / write a path:
+
+```tsx
+<Terminal
+  output={out}
+  onData={(d) => backend.send(d)}
+  onPaste={({ text, images }) => {
+    for (const img of images) upload(img).then((url) => backend.send(url));
+    // return false here to also suppress the native text paste
+  }}
+/>
+```
+
+**Context menu** — right-click shows Copy / Paste / Select all / Clear by default.
+Customize it with the `contextMenu` prop:
+
+```tsx
+// disable it
+<Terminal contextMenu={false} … />
+
+// add to the defaults (the function gets the default items)
+<Terminal
+  contextMenu={(ctx, defaults) => [
+    ...defaults,
+    { id: "sep", separator: true },
+    { id: "send-agent", label: "Send selection to agent", icon: "🤖",
+      disabled: !ctx.hasSelection, onSelect: (c) => agent.send(c.selection) },
+  ]}
+  …
+/>
+```
+
+Each item is `{ id, label?, icon?, disabled?, separator?, onSelect?(ctx) }`. Set
+`clipboard={false}` to turn off the copy chord + image-paste interception entirely.
 
 ## Switching shells
 

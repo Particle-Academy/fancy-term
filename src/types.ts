@@ -1,5 +1,7 @@
 import type { HTMLAttributes } from "react";
 import type { ITheme, Terminal as XTerm } from "@xterm/xterm";
+import type { ClipboardPayload } from "./clipboard";
+import type { TerminalContextMenuConfig } from "./context-menu";
 
 /** xterm.js color theme (re-exported for ergonomic typing). */
 export type TerminalTheme = ITheme;
@@ -51,6 +53,14 @@ export interface TerminalHandle {
   getBuffer: () => string;
   /** The current text selection, or "" when nothing is selected. */
   getSelection: () => string;
+  /** Copy the current selection to the system clipboard. Resolves false when there's nothing selected or the clipboard is unavailable. */
+  copySelection: () => Promise<boolean>;
+  /** Paste text into the terminal. With no argument, reads the system clipboard. Honors xterm's bracketed-paste mode. */
+  paste: (text?: string) => Promise<void>;
+  /** Select the entire buffer. */
+  selectAll: () => void;
+  /** Clear the current selection. */
+  clearSelection: () => void;
   /**
    * Switch the active shell by id. Resolves the matching {@link ShellProfile}
    * from `shells` and fires `onShellChange`; in uncontrolled mode it also updates
@@ -88,9 +98,23 @@ export interface TerminalOptions {
   onData?: (data: string) => void;
   /** Notified on terminal resize. */
   onResize?: (size: { cols: number; rows: number }) => void;
+  /**
+   * Enable clipboard wiring — the Ctrl+Shift+C / Cmd+C copy chord and the paste
+   * interceptor (which surfaces pasted images via {@link onPaste}). Default true.
+   * Text paste works regardless; this gates the *enhanced* clipboard behavior.
+   */
+  clipboard?: boolean;
+  /**
+   * Fired on every paste with the clipboard payload — `{ text, files, images }`.
+   * Plain text still pastes into the terminal natively; this is where a host
+   * receives pasted **images** (a shell can't render them) to upload / hand to an
+   * agent / write a path. Return `false` to fully consume the paste (suppress the
+   * default text paste — e.g. to transform it, then call `handle.paste(...)`).
+   */
+  onPaste?: (payload: ClipboardPayload) => void | boolean;
 }
 
-export interface TerminalProps extends TerminalOptions, Omit<HTMLAttributes<HTMLDivElement>, "onInput" | "onResize" | "children"> {
+export interface TerminalProps extends TerminalOptions, Omit<HTMLAttributes<HTMLDivElement>, "onInput" | "onResize" | "onPaste" | "contextMenu" | "children"> {
   /**
    * The controlled output buffer. The component diffs against the previous value
    * and writes only the appended delta, so a host can drive the terminal from
@@ -114,6 +138,14 @@ export interface TerminalProps extends TerminalOptions, Omit<HTMLAttributes<HTML
    * `shells` is provided. Default `false` — opt-in so existing layout is unchanged.
    */
   showShellBar?: boolean;
+
+  /**
+   * The right-click selection context menu. `false` disables it; `true` / omitted
+   * gives the default Copy / Paste / Select all / Clear menu; an array replaces
+   * the items; a `(ctx, defaults) => items` function lets you add/remove/reorder
+   * (e.g. append a "Send to agent" item). See {@link TerminalContextMenuConfig}.
+   */
+  contextMenu?: TerminalContextMenuConfig;
 }
 
 /**

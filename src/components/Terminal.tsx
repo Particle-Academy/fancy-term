@@ -8,8 +8,10 @@ import {
 } from "react";
 import { useTerminal } from "../hooks/use-terminal";
 import { ShellSwitcher } from "./ShellSwitcher";
+import { TerminalContextMenu } from "./TerminalContextMenu";
 import { diffOutput } from "../output-diff";
 import { decideShellSelect } from "../shell-select";
+import { resolveMenuItems, type TerminalContextMenuContext, type TerminalContextMenuItem } from "../context-menu";
 import type { TerminalHandle, TerminalProps } from "../types";
 
 /**
@@ -51,6 +53,9 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     activeShell,
     onShellChange,
     showShellBar = false,
+    clipboard,
+    onPaste,
+    contextMenu,
     className,
     style,
     ...rest
@@ -92,6 +97,8 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     initialOutput: output === undefined ? initialOutput : undefined,
     onData,
     onResize,
+    clipboard,
+    onPaste,
   });
 
   useImperativeHandle(
@@ -116,10 +123,44 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     written.current = output;
   }, [output, handle]);
 
+  // Right-click selection context menu (Copy / Paste / Select all / Clear by
+  // default; customizable via the `contextMenu` prop).
+  const [menu, setMenu] = useState<{
+    at: { x: number; y: number };
+    items: TerminalContextMenuItem[];
+    ctx: TerminalContextMenuContext;
+  } | null>(null);
+
+  const openMenu = useCallback(
+    (e: React.MouseEvent) => {
+      if (contextMenu === false) return;
+      e.preventDefault();
+      const selection = handle.getSelection();
+      const ctx: TerminalContextMenuContext = {
+        hasSelection: selection.length > 0,
+        selection,
+        readOnly: !!readOnly,
+      };
+      const items = resolveMenuItems(contextMenu, ctx, {
+        copy: () => void handle.copySelection(),
+        paste: () => void handle.paste(),
+        selectAll: () => handle.selectAll(),
+        clear: () => handle.clear(),
+      });
+      if (items) setMenu({ at: { x: e.clientX, y: e.clientY }, items, ctx });
+    },
+    [contextMenu, handle, readOnly],
+  );
+
+  const menuNode = menu ? (
+    <TerminalContextMenu at={menu.at} items={menu.items} ctx={menu.ctx} onClose={() => setMenu(null)} />
+  ) : null;
+
   const surface = (
     <div
       ref={containerRef}
       data-fancy-terminal=""
+      onContextMenu={openMenu}
       data-readonly={readOnly ? "" : undefined}
       data-fancy-terminal-shell={shellId ?? undefined}
       // When the shell bar is shown the wrapper owns the box; the surface flexes.
@@ -132,7 +173,14 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     />
   );
 
-  if (!showShellBar || !shells) return surface;
+  if (!showShellBar || !shells) {
+    return (
+      <>
+        {surface}
+        {menuNode}
+      </>
+    );
+  }
 
   return (
     <div
@@ -159,6 +207,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
         />
       </div>
       {surface}
+      {menuNode}
     </div>
   );
 });
