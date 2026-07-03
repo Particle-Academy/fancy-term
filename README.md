@@ -77,7 +77,10 @@ fancy-query's `useFancyStream`.
 | `activeShell` | `string` | controlled selected shell id (omit for uncontrolled) |
 | `onShellChange` | `(id, profile) => void` | fired when the user / `setShell` switches |
 | `showShellBar` | `boolean` | render the `<ShellSwitcher>` toolbar above the surface (default `false`) |
-| `clipboard` | `boolean` | enable the copy chord + paste interceptor (default `true`) |
+| `clipboard` | `boolean \| { writeText, readText }` | clipboard wiring: `true`/omit (navigator), `false` (off), or an **injectable provider** for sandboxed Electron hosts (default `true`) |
+| `osc52` | `"copy" \| "read" \| "both" \| false` | OSC 52 policy — let terminal programs (Claude Code, tmux, vim) set/read the clipboard (default `"copy"`, write-only) |
+| `copyPaste` | `"contextmenu" \| "linux" \| "winmac"` | copy/paste convention (see below); omit for the default chord |
+| `onReady` | `(xterm) => void` | called once xterm is opened + measured (twin of `handle.ready`) |
 | `onPaste` | `(payload) => void \| boolean` | every paste; receives `{ text, files, images }` — handle pasted **images** here. Return `false` to suppress the native text paste |
 | `contextMenu` | `false \| Item[] \| (ctx, defaults) => Item[]` | the right-click selection menu (see [Clipboard & context menu](#clipboard--context-menu)) |
 
@@ -93,7 +96,8 @@ const term = useRef<TerminalHandle>(null);
 // term.current.selectAll() / clearSelection()
 // term.current.setShell("pwsh") → switch the active shell (fires onShellChange)
 // term.current.getShell()       → the active shell id
-// term.current.xterm            → the raw xterm.js instance (escape hatch)
+// term.current.xterm            → the raw xterm.js instance (escape hatch; null before mount)
+// term.current.ready            → Promise<XTerm>, resolves once opened + measured
 ```
 
 ## Clipboard & context menu
@@ -137,6 +141,49 @@ Customize it with the `contextMenu` prop:
 
 Each item is `{ id, label?, icon?, disabled?, separator?, onSelect?(ctx) }`. Set
 `clipboard={false}` to turn off the copy chord + image-paste interception entirely.
+
+### OSC 52 (terminal-program clipboard)
+
+Modern TUIs — Claude Code, tmux, vim/neovim — copy their own selection with an
+**OSC 52** escape (`ESC ] 52`). xterm.js drops these by default, so the app shows
+"copied" but nothing reaches the system clipboard. fancy-term handles OSC 52 out
+of the box (`osc52="copy"`), routing it through the active clipboard provider:
+
+```tsx
+<Terminal osc52="copy" … />   // default — programs may WRITE the clipboard
+<Terminal osc52="both" … />   // also answer read (?) requests — an exfiltration risk, opt in
+<Terminal osc52={false} … />  // disable OSC 52
+```
+
+### Copy/paste conventions
+
+`copyPaste` picks the UX to match your platform expectations:
+
+```tsx
+<Terminal copyPaste="winmac" … />  // Ctrl/Cmd+C copies selection, Ctrl/Cmd+V pastes
+<Terminal copyPaste="linux" … />   // highlight-to-copy + middle-click paste
+<Terminal copyPaste="contextmenu" … /> // menu only (+ Ctrl+Shift+C)
+```
+
+Omit it for the historical default (Ctrl+Shift+C + Cmd+C-with-selection).
+**Ctrl+Shift+C always copies** and plain **Ctrl+C stays SIGINT** (unless `winmac`
++ a selection) in every mode.
+
+### Injectable clipboard (Electron)
+
+In a sandboxed Electron renderer `navigator.clipboard` silently no-ops. Supply a
+**provider** so every copy/paste path — the chord, the menu, OSC 52,
+`handle.copySelection` / `handle.paste` — bridges to your main-process clipboard:
+
+```tsx
+<Terminal
+  clipboard={{
+    writeText: (text) => window.electron.clipboard.write(text), // → IPC
+    readText: () => window.electron.clipboard.read(),
+  }}
+  osc52="copy"
+/>
+```
 
 ## Switching shells
 

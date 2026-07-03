@@ -54,6 +54,9 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     onShellChange,
     showShellBar = false,
     clipboard,
+    osc52,
+    copyPaste,
+    onReady,
     onPaste,
     contextMenu,
     className,
@@ -98,13 +101,36 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     onData,
     onResize,
     clipboard,
+    osc52,
+    copyPaste,
+    onReady,
     onPaste,
   });
 
+  // Delegate `xterm` / `ready` as live getters rather than spreading `handle`
+  // (object spread would snapshot the getters — capturing xterm === null before
+  // the container is measured, the exact race consumers hit). Methods are stable.
   useImperativeHandle(
     ref,
     (): TerminalHandle => ({
-      ...handle,
+      get xterm() {
+        return handle.xterm;
+      },
+      get ready() {
+        return handle.ready;
+      },
+      write: handle.write,
+      writeln: handle.writeln,
+      clear: handle.clear,
+      reset: handle.reset,
+      fit: handle.fit,
+      focus: handle.focus,
+      getBuffer: handle.getBuffer,
+      getSelection: handle.getSelection,
+      copySelection: handle.copySelection,
+      paste: handle.paste,
+      selectAll: handle.selectAll,
+      clearSelection: handle.clearSelection,
       setShell: selectShell,
       getShell: () => shellStateRef.current.shellId,
     }),

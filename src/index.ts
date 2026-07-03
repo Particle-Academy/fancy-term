@@ -20,9 +20,17 @@ export { fancyDarkTheme } from "./theme";
 // Shells
 export { BUILTIN_SHELLS, resolveShell } from "./types";
 
-// Clipboard helpers (text + image paste)
-export { isImageFile } from "./clipboard";
-export type { ClipboardPayload } from "./clipboard";
+// Clipboard helpers (text + image paste) + the injectable provider
+export { isImageFile, navigatorClipboard, resolveClipboard } from "./clipboard";
+export type { ClipboardPayload, ClipboardProvider, ClipboardOption } from "./clipboard";
+
+// OSC 52 (terminal-program clipboard) — pure parse/codec exported for reuse/testing
+export { parseOsc52, encodeBase64, decodeBase64, osc52Response, registerOsc52 } from "./osc52";
+export type { Osc52Mode, Osc52Request } from "./osc52";
+
+// Copy/paste UX modes — pure decision helpers
+export { copyPasteBehavior, resolveKeyAction } from "./copy-paste-mode";
+export type { CopyPasteMode, CopyPasteBehavior, KeyEventLike } from "./copy-paste-mode";
 
 // Selection context menu (customizable)
 export { defaultMenuItems, resolveMenuItems } from "./context-menu";

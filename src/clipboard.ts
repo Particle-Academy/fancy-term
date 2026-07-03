@@ -87,3 +87,54 @@ export async function readClipboardText(): Promise<string> {
   }
   return "";
 }
+
+/**
+ * A host-supplied clipboard. Every copy/paste path in fancy-term — the copy
+ * chord, the context menu, OSC 52, `handle.copySelection` / `handle.paste` —
+ * routes through this, so an Electron host (where `navigator.clipboard` silently
+ * no-ops in a sandboxed renderer) can bridge to its main-process clipboard over
+ * IPC. `writeText` may return anything (a `Promise<void>` from IPC is fine);
+ * `readText` returns the clipboard text.
+ */
+export interface ClipboardProvider {
+  writeText: (text: string) => void | Promise<unknown>;
+  readText: () => string | Promise<string>;
+}
+
+/** The default provider — `navigator.clipboard` with the legacy `execCommand` fallback. */
+export const navigatorClipboard: ClipboardProvider = {
+  writeText: (text) => writeClipboardText(text),
+  readText: () => readClipboardText(),
+};
+
+/** The `clipboard` prop: `false` disables clipboard wiring; a provider object injects a host clipboard; `true`/omitted uses {@link navigatorClipboard}. */
+export type ClipboardOption = boolean | ClipboardProvider;
+
+/** Normalize the `clipboard` prop into `{ enabled, provider }`, read live per call. */
+export function resolveClipboard(clipboard: ClipboardOption | undefined): {
+  enabled: boolean;
+  provider: ClipboardProvider;
+} {
+  if (clipboard === false) return { enabled: false, provider: navigatorClipboard };
+  if (clipboard && typeof clipboard === "object") return { enabled: true, provider: clipboard };
+  return { enabled: true, provider: navigatorClipboard };
+}
+
+/** Write via a provider, resolving `true` on success and `false` if it throws/rejects. */
+export async function providerWrite(provider: ClipboardProvider, text: string): Promise<boolean> {
+  try {
+    await provider.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Read via a provider, resolving `""` if it throws/rejects. */
+export async function providerRead(provider: ClipboardProvider): Promise<string> {
+  try {
+    return (await provider.readText()) ?? "";
+  } catch {
+    return "";
+  }
+}

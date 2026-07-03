@@ -1,6 +1,8 @@
 import type { HTMLAttributes } from "react";
 import type { ITheme, Terminal as XTerm } from "@xterm/xterm";
-import type { ClipboardPayload } from "./clipboard";
+import type { ClipboardOption, ClipboardPayload } from "./clipboard";
+import type { CopyPasteMode } from "./copy-paste-mode";
+import type { Osc52Mode } from "./osc52";
 import type { TerminalContextMenuConfig } from "./context-menu";
 
 /** xterm.js color theme (re-exported for ergonomic typing). */
@@ -37,6 +39,13 @@ export interface ShellProfile {
 export interface TerminalHandle {
   /** The underlying xterm.js instance — escape hatch for addons / advanced use. Null before mount. */
   readonly xterm: XTerm | null;
+  /**
+   * Resolves with the xterm instance once it's opened + measured. Because
+   * `xterm` is null until the container lays out, a consumer that must wire an
+   * addon can `await handle.ready` instead of polling. Re-armed if the terminal
+   * is torn down + recreated (e.g. a container change).
+   */
+  readonly ready: Promise<XTerm>;
   /** Write raw data (ANSI escape sequences honored) to the terminal. */
   write: (data: string) => void;
   /** Write data followed by CRLF. */
@@ -99,11 +108,39 @@ export interface TerminalOptions {
   /** Notified on terminal resize. */
   onResize?: (size: { cols: number; rows: number }) => void;
   /**
-   * Enable clipboard wiring — the Ctrl+Shift+C / Cmd+C copy chord and the paste
-   * interceptor (which surfaces pasted images via {@link onPaste}). Default true.
-   * Text paste works regardless; this gates the *enhanced* clipboard behavior.
+   * Clipboard wiring — gates the Ctrl+Shift+C / Cmd+C copy chord, the paste
+   * interceptor ({@link onPaste}), the context-menu copy/paste, and OSC 52.
+   *
+   * - `true` / omitted — enabled, backed by `navigator.clipboard`.
+   * - `false` — disabled (no copy chord / OSC 52; native text paste still works).
+   * - a `{ writeText, readText }` **provider** — every copy/paste path routes
+   *   through it. Supply this in a sandboxed Electron renderer, where
+   *   `navigator.clipboard` silently no-ops, to bridge to the main-process
+   *   clipboard over IPC.
    */
-  clipboard?: boolean;
+  clipboard?: ClipboardOption;
+  /**
+   * OSC 52 clipboard policy — lets terminal programs (Claude Code, tmux, vim)
+   * set/read the system clipboard via `ESC ] 52`. `"copy"` (default) allows
+   * writes only; `"read"` / `"both"` also answer read requests (an exfiltration
+   * risk — opt in deliberately); `false` disables it. Routed through the same
+   * clipboard provider as {@link clipboard}; a no-op when clipboard is `false`.
+   * Default `"copy"`.
+   */
+  osc52?: Osc52Mode;
+  /**
+   * Copy/paste UX convention: `"contextmenu"` (menu + Ctrl+Shift+C),
+   * `"linux"` (highlight-to-copy + middle-click paste), or `"winmac"`
+   * (Ctrl/Cmd+C copies the selection, Ctrl/Cmd+V pastes). Omit for the historical
+   * default (Ctrl+Shift+C + Cmd+C-with-selection). Ctrl+Shift+C always copies.
+   */
+  copyPaste?: CopyPasteMode;
+  /**
+   * Called once the xterm instance is opened + attached — the imperative twin of
+   * {@link TerminalHandle.ready}. Use it to load an addon without racing the
+   * container layout (where `handle.xterm` is still null).
+   */
+  onReady?: (xterm: XTerm) => void;
   /**
    * Fired on every paste with the clipboard payload — `{ text, files, images }`.
    * Plain text still pastes into the terminal natively; this is where a host
