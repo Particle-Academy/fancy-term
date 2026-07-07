@@ -41,10 +41,13 @@ export type {
   TerminalMenuActions,
 } from "./context-menu";
 
-// Pure helpers (the copy chord decision + menu clamp) — exported for reuse/testing
+// Pure helpers (the copy chord decision + menu clamp + selection snapshot) —
+// exported for reuse/testing
 export { shouldCopyEvent } from "./copy-keybinding";
 export type { CopyKeyEvent } from "./copy-keybinding";
 export { clampMenuPosition } from "./menu-position";
+export { nextSelectionSnapshot } from "./selection-snapshot";
+export type { SnapshotPointerEvent } from "./selection-snapshot";
 
 // Types
 export type {

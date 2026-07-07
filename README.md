@@ -142,6 +142,11 @@ Customize it with the `contextMenu` prop:
 Each item is `{ id, label?, icon?, disabled?, separator?, onSelect?(ctx) }`. Set
 `clipboard={false}` to turn off the copy chord + image-paste interception entirely.
 
+`ctx.selection` is **snapshotted before the right-click lands** and the built-in
+Copy writes that snapshot (through the active clipboard provider) — so it still
+copies over a mouse-reporting TUI (Claude Code, tmux, vim with mouse mode),
+where the app's redraw clears xterm's live selection before you can click Copy.
+
 ### OSC 52 (terminal-program clipboard)
 
 Modern TUIs — Claude Code, tmux, vim/neovim — copy their own selection with an

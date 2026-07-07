@@ -29,7 +29,13 @@ export interface TerminalContextMenuItem {
 
 /** The actions the built-in items dispatch to (wired by the component). */
 export interface TerminalMenuActions {
-  copy: () => void;
+  /**
+   * Receives the menu's {@link TerminalContextMenuContext} so it can copy the
+   * selection **snapshotted when the menu opened** — by click time the live
+   * xterm selection is often already cleared (a mouse-reporting TUI's redraw
+   * clears it right after the right-click), so re-reading it copies nothing.
+   */
+  copy: (ctx: TerminalContextMenuContext) => void;
   paste: () => void;
   selectAll: () => void;
   clear: () => void;

@@ -11,7 +11,9 @@ import { ShellSwitcher } from "./ShellSwitcher";
 import { TerminalContextMenu } from "./TerminalContextMenu";
 import { diffOutput } from "../output-diff";
 import { decideShellSelect } from "../shell-select";
+import { providerWrite, resolveClipboard } from "../clipboard";
 import { resolveMenuItems, type TerminalContextMenuContext, type TerminalContextMenuItem } from "../context-menu";
+import { nextSelectionSnapshot } from "../selection-snapshot";
 import type { TerminalHandle, TerminalProps } from "../types";
 
 /**
@@ -157,25 +159,49 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     ctx: TerminalContextMenuContext;
   } | null>(null);
 
+  // #2 — over a mouse-reporting TUI (Claude Code, tmux, vim) the app's redraw
+  // asynchronously clears xterm's selection right after a right-click, so both
+  // late reads lose: at `contextmenu` time the selection may already be gone,
+  // and by the time the user clicks Copy it almost always is. Track a snapshot
+  // at pointer time (capture phase — before xterm / the app can react) and use
+  // it as the menu's source of truth whenever the live selection is empty.
+  const selectionSnapshot = useRef("");
+  const trackSelection = useCallback(
+    (e: React.MouseEvent) => {
+      selectionSnapshot.current = nextSelectionSnapshot(
+        selectionSnapshot.current,
+        { type: e.type as "mousedown" | "mouseup", button: e.button },
+        handle.getSelection(),
+      );
+    },
+    [handle],
+  );
+
   const openMenu = useCallback(
     (e: React.MouseEvent) => {
       if (contextMenu === false) return;
       e.preventDefault();
-      const selection = handle.getSelection();
+      const selection = handle.getSelection() || selectionSnapshot.current;
       const ctx: TerminalContextMenuContext = {
         hasSelection: selection.length > 0,
         selection,
         readOnly: !!readOnly,
       };
       const items = resolveMenuItems(contextMenu, ctx, {
-        copy: () => void handle.copySelection(),
+        // Copy writes the SNAPSHOTTED selection through the active clipboard
+        // provider — never a click-time re-read, which copies "" over a TUI
+        // (falling back to the live selection only when the snapshot is empty).
+        copy: (c) => {
+          const text = c.selection || handle.getSelection();
+          if (text) void providerWrite(resolveClipboard(clipboard).provider, text);
+        },
         paste: () => void handle.paste(),
         selectAll: () => handle.selectAll(),
         clear: () => handle.clear(),
       });
       if (items) setMenu({ at: { x: e.clientX, y: e.clientY }, items, ctx });
     },
-    [contextMenu, handle, readOnly],
+    [contextMenu, handle, readOnly, clipboard],
   );
 
   const menuNode = menu ? (
@@ -186,6 +212,8 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     <div
       ref={containerRef}
       data-fancy-terminal=""
+      onMouseDownCapture={trackSelection}
+      onMouseUpCapture={trackSelection}
       onContextMenu={openMenu}
       data-readonly={readOnly ? "" : undefined}
       data-fancy-terminal-shell={shellId ?? undefined}
