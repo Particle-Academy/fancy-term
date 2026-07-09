@@ -30,4 +30,4 @@ jobs:
       # 0.1.0 bootstrap. OIDC needs npm 11.5+; the runner ships npm 10, so we
       # fetch a fresh npm via npx just for the publish.
       - name: Publish
-        run: npx -y npm@latest publish --provenance --access public
+        run: npx -y npm@11.18.0 publish --provenance --access public
