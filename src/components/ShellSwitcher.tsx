@@ -165,7 +165,12 @@ export function ShellSwitcher({
           id={listId}
           aria-label="Shells"
           tabIndex={-1}
-          // eslint-disable-next-line jsx-a11y/no-autofocus
+          // Autofocus is deliberate: this list only renders once the switcher
+          // is opened by an explicit user action, so focus is going where the
+          // person just asked to be. (This used to carry an
+          // `eslint-disable jsx-a11y/no-autofocus`, but jsx-a11y has never been
+          // a dependency here — it silenced a rule that did not exist, and
+          // broke linting once ESLint was actually turned on.)
           autoFocus
           onKeyDown={onListKeyDown}
           ref={(el) => el?.focus()}

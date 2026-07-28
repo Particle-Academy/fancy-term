@@ -1,7 +1,7 @@
 {
   "name": "@particle-academy/fancy-term",
   "version": "0.4.1",
-  "description": "Human+ Terminal for React — a controlled, themeable <Terminal> wrapping xterm.js, with hooks and an MCP-bridgeable surface so embedded agents read the buffer, write input, and run commands without DOM-scraping.",
+  "description": "Human+ Terminal for React \u2014 a controlled, themeable <Terminal> wrapping xterm.js, with hooks and an MCP-bridgeable surface so embedded agents read the buffer, write input, and run commands without DOM-scraping.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Particle-Academy/fancy-term.git"
@@ -32,7 +32,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "lint": "tsc --noEmit",
+    "lint": "tsc --noEmit && eslint .",
     "test": "vitest run",
     "clean": "rm -rf dist",
     "prepublishOnly": "tsup"
@@ -55,12 +55,15 @@
   "devDependencies": {
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@xterm/xterm": "^5.5.0",
     "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "eslint": "^10.8.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tsup": "^8.5.0",
     "typescript": "^5.8.0",
+    "typescript-eslint": "^8.65.0",
     "vitest": "^4.1.8"
   },
   "publishConfig": {
