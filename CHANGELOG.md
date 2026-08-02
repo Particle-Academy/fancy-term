@@ -14,6 +14,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## 0.4.1 — 2026-07-06
+
+### Fixed
+
+- context-menu Copy writes the menu-open selection snapshot, not a click-time re-read
+
+## 0.4.0 — 2026-07-02
+
+### Added
+
+- Electron-safe clipboard — injectable provider, OSC 52, copy/paste modes, ready signal (#1)
+
+## 0.3.0 — 2026-06-14
+
+### Added
+
+- clipboard (copy/paste + images) + customizable selection context menu
+
+## 0.2.2 — 2026-06-11
+
+### Fixed
+
+- omit undefined rows/cols from xterm constructor (was console-erroring)
+
+## 0.2.1 — 2026-06-11
+
+### Fixed
+
+- guard fit() via proposeDimensions — no xterm resize(undefined) on unlaid-out container
+
+## 0.2.0 — 2026-06-11
+
+### Changed
+
+- **BREAKING** — shell / profile switching (UI + API + session)
+
+## 0.1.0 — 2026-06-10
+
+### Added
+
+- fancy-term 0.1.0 — Human+ Terminal (xterm.js wrapper)
+
 ### Changed
 
 - Replaced an `eslint-disable jsx-a11y/no-autofocus` in `ShellSwitcher` with a
