@@ -1,5 +1,7 @@
 # @particle-academy/fancy-term
 
+[![Fancified](art/fancified.svg)](https://particle.academy)
+
 **Human+ Terminal for React** — a controlled, themeable `<Terminal>` wrapping
 [xterm.js](https://xtermjs.org), with hooks and an MCP-bridgeable surface so
 embedded agents read the buffer, write input, and run commands **without
@@ -16,7 +18,7 @@ Like every Fancy UI component it serves two surfaces at once:
 Sexy by default via a Fancy dark theme drawn from the react-fancy Tailwind v4
 tokens.
 
-> **Status:** 0.2.0. `<Terminal>` + `useTerminal` / `useTerminalFit` /
+> **Status:** pre-1.0. `<Terminal>` + `useTerminal` / `useTerminalFit` /
 > `useTerminalSession` are in place, plus **shell / profile switching** (the
 > `<ShellSwitcher>` component, controlled `shells` / `activeShell` props, and the
 > session hook's `switchShell`). The `registerTerminalBridge` MCP bridge
