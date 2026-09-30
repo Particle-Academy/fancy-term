@@ -14,6 +14,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## 0.5.1 — 2026-09-29
+
+### Fixed
+
+- **`docs/` is real now.** `files` already listed `docs`, and the directory did
+  not exist — so every published tarball carried a `files` entry pointing at
+  nothing and shipped no reference at all. That is the worse half of this
+  defect: a `files` array that names `docs` reads as compliant to anyone
+  checking the manifest, so nothing ever looked in the tarball.
+
+  Adds `docs/Terminal.md` and `docs/ShellSwitcher.md` — the full prop and
+  `TerminalOptions` tables, the imperative handle (including `getBuffer()`, the
+  Human+ affordance an agent reads instead of scraping the DOM), why the
+  clipboard is injectable and what silently breaks in a sandboxed Electron
+  renderer without a provider, why OSC 52 defaults to write-only, and how
+  pasted images reach the host.
+
+  No code changed.
+
 ## 0.5.0 — 2026-08-07
 
 ### Changed
