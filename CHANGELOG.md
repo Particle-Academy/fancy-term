@@ -14,6 +14,58 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## 0.6.2 — 2026-10-10
+
+### Fixed
+
+- **The ESM bundle could not be imported under plain Node.** It emitted
+  `import { Terminal } from "@xterm/xterm"`, and because that package is
+  CommonJS-only with exports Node's `cjs-module-lexer` cannot statically detect,
+  any bundler-free import threw:
+
+  ```
+  SyntaxError: Named export 'Terminal' not found. The requested module
+  '@xterm/xterm' is a CommonJS module, which may not support all
+  module.exports as named exports.
+  ```
+
+  `require("@xterm/xterm")` worked fine, which is exactly why this read as our
+  bug rather than a lexer limit. **Vite's interop hid it**, so the component
+  worked in every bundled app and nobody hit it — until an SSR consumer tried
+  `react-dom/server`. Reported with measurements by `claude · genie2`, whose SSR
+  render tests died at import on CI and in a test VM.
+
+  Fixed by importing the default and destructuring, which works under Node and
+  every bundler. **Nothing to change on your side** — the public API is
+  identical.
+
+- **A real-Node import check now runs on every `npm test`**
+  (`scripts/check-esm-import.mjs`). This defect was invisible to the whole
+  suite and always would have been: **vitest runs through Vite, whose CommonJS
+  interop rewrites the exact import that breaks.** The check loads the built
+  bundle in a separate Node process, with a positive control that the import
+  actually yields `Terminal` + `useTerminal` — so a bundle that imported
+  nothing cannot pass it.
+
+### Documentation
+
+- **`docs/Terminal.md` now says this package is CLIENT-ONLY, with the
+  measurement.** A server-side import throws `ReferenceError: self is not
+  defined` **before any component runs**, and the cause is narrower than it
+  looks:
+
+  | import, in plain Node | result |
+  |---|---|
+  | `@xterm/xterm` | loads |
+  | **`@xterm/addon-fit`** | **`ReferenceError: self is not defined`** |
+
+  `@xterm/addon-fit` is a UMD bundle whose wrapper references the browser global
+  `self`. **That is upstream packaging and is NOT fixed by this release** — it
+  cannot be, from here. Load the package from a dynamic, client-side `import()`
+  for SSR; the docs show the shape. Worth stating plainly because the two
+  failures are easy to conflate, and a consumer who finds out the way genie2 did
+  spends a CI run on it.
+
 ## 0.6.1 — 2026-10-10
 
 ### Added

@@ -8,7 +8,49 @@ and an agent can read what the human sees.
 
 ```tsx
 import { Terminal } from "@particle-academy/fancy-term";
+import "@particle-academy/fancy-term/styles.css";
 ```
+
+### This package is CLIENT-ONLY. Load it dynamically for SSR.
+
+**Importing it at module scope on a server throws**, before any component runs:
+
+```
+ReferenceError: self is not defined
+```
+
+Measured, so you do not have to guess which dependency:
+
+| import, in plain Node | result |
+|---|---|
+| `@xterm/xterm` | loads |
+| **`@xterm/addon-fit`** | **`ReferenceError: self is not defined`** |
+
+`@xterm/addon-fit` is a UMD bundle whose wrapper references `self`, a browser
+global. That is upstream packaging, not an interop problem a CommonJS entry
+would fix — the module simply cannot be *evaluated* outside a browser.
+
+So in an SSR app, reach it only from a dynamically imported, client-side path:
+
+```tsx
+const TerminalPanel = lazy(async () => {
+  const { Terminal } = await import("@particle-academy/fancy-term");
+  await import("@particle-academy/fancy-term/styles.css");
+  return { default: () => <Terminal output={out} onData={send} /> };
+});
+```
+
+Any `clientOnly`-style wrapper does the same job; the requirement is that the
+server's render never reaches the import. A bundler that code-splits on
+`import()` keeps it out of the server bundle for you.
+
+**A separate thing that WAS ours, fixed in 0.6.2:** the ESM bundle used to emit
+`import { Terminal } from "@xterm/xterm"`, and because that package is
+CommonJS-only with exports Node cannot statically detect, a plain-Node import
+threw `SyntaxError: Named export 'Terminal' not found`. If you saw that error,
+upgrade — it is gone. `scripts/check-esm-import.mjs` now loads the built bundle
+in a real Node process on every `npm test`, because vitest runs through Vite and
+its interop hides exactly this class of defect.
 
 ## Basic Usage
 

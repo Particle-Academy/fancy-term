@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import pkg from "../package.json";
 
@@ -126,5 +127,82 @@ describe("the stylesheet is loadable without naming xterm", () => {
         const code = xtermCss.replace(/\/\*[\s\S]*?\*\//g, "").trim();
 
         expect(code).toBe('@import "@xterm/xterm/css/xterm.css";');
+    });
+});
+
+/**
+ * No VALUE import may name bindings from a CommonJS-only peer.
+ *
+ * `@xterm/xterm` and `@xterm/addon-fit` ship CommonJS bundles whose exports
+ * Node's cjs-module-lexer cannot statically detect. An ESM build that emits
+ * `import { Terminal } from "@xterm/xterm"` therefore throws
+ * `SyntaxError: Named export 'Terminal' not found` under plain Node — SSR, a
+ * `react-dom/server` render test, any consumer without a bundler. Shipped in
+ * 0.6.1 and found by `claude · genie2`, whose SSR render tests died at import.
+ *
+ * `import type { ... }` is FINE and deliberately allowed: type imports are
+ * erased at build time and reach no bundle. The guard has to tell the two
+ * apart, or it would forbid the legitimate type imports in `types.ts` and
+ * `osc52.ts` and get deleted for crying wolf.
+ *
+ * This is the SOURCE half, and it is the weaker half — it tests a property that
+ * PREDICTS the failure. The real one is `scripts/check-esm-import.mjs`, which
+ * imports the built bundle in a real Node process, because **vitest cannot see
+ * this defect at all**: it runs through Vite, whose CommonJS interop rewrites
+ * exactly the import that breaks. Both are wired into `npm test`.
+ */
+const CJS_ONLY_PEERS = ["@xterm/xterm", "@xterm/addon-fit"];
+
+function sourceFiles(dir: string): string[] {
+    const out: string[] = [];
+    for (const entry of readdirSync(dir)) {
+        const full = `${dir}/${entry}`;
+        if (statSync(full).isDirectory()) {
+            out.push(...sourceFiles(full));
+        } else if (/\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry) && !/\.d\.ts$/.test(entry)) {
+            out.push(full);
+        }
+    }
+    return out;
+}
+
+/** Source lines, with any trailing CR removed. This repo's files are LF. */
+function linesOf(file: string): string[] {
+    return readFileSync(file, "utf8").split("\n").map((l) => l.replace(/\r$/, ""));
+}
+
+describe("no value import names bindings from a CommonJS-only peer", () => {
+    const root = fileURLToPath(new URL("../src", import.meta.url));
+    const files = sourceFiles(root.split("\\").join("/"));
+
+    it("found source files to check", () => {
+        // Vacuity guard: a discovery that finds nothing passes over an empty set
+        // and reports success, leaving this whole block decorative.
+        expect(files.length).toBeGreaterThan(10);
+    });
+
+    for (const peer of CJS_ONLY_PEERS) {
+        it(`no bare named import from ${peer}`, () => {
+            const offenders: string[] = [];
+            for (const file of files) {
+                for (const line of linesOf(file)) {
+                    // `import {` ... from "<peer>" — but NOT `import type {`.
+                    if (/^\s*import\s*\{/.test(line) && line.includes(`"${peer}"`)) {
+                        offenders.push(`${file.split("/").slice(-2).join("/")}: ${line.trim()}`);
+                    }
+                }
+            }
+            expect(offenders, "use a default import and destructure instead").toEqual([]);
+        });
+    }
+
+    it("still ALLOWS type-only imports, which are erased at build time", () => {
+        // Scoped so the rule does not argue with people: types.ts and osc52.ts
+        // legitimately `import type` from these peers, and must keep working.
+        const typeImports = files
+            .flatMap(linesOf)
+            .filter((l) => /^\s*import type\s*\{/.test(l) && CJS_ONLY_PEERS.some((p) => l.includes(`"${p}"`)));
+
+        expect(typeImports.length).toBeGreaterThan(0);
     });
 });

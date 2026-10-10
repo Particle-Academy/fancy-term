@@ -1,6 +1,26 @@
 import { useEffect, useRef, type RefObject } from "react";
-import { Terminal as XTerm } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
+// `@xterm/xterm` and `@xterm/addon-fit` are CommonJS-ONLY, and their exports are
+// not statically detectable by Node's cjs-module-lexer. A named import here
+// becomes `import { Terminal } from '@xterm/xterm'` in the ESM bundle, which
+// throws `SyntaxError: Named export 'Terminal' not found` the moment anyone
+// imports this package WITHOUT a bundler — SSR, a react-dom/server render test,
+// a plain Node script. Vite's interop hides it, which is why the component
+// works in an app and why this shipped in 0.6.1 unnoticed.
+//
+// A DEFAULT import is the fix: for a CJS module Node binds `default` to
+// `module.exports`, so destructuring off it works under both Node and every
+// bundler. Types come from a separate `import type`, which is erased.
+//
+// Guarded two ways: `src/packaging.test.ts` forbids a bare named import from
+// these peers, and `scripts/check-esm-import.mjs` imports the built bundle in a
+// real Node process — vitest runs through Vite and CANNOT see this defect.
+import xtermPkg from "@xterm/xterm";
+import addonFitPkg from "@xterm/addon-fit";
+import type { Terminal as XTerm } from "@xterm/xterm";
+import type { FitAddon } from "@xterm/addon-fit";
+
+const { Terminal: XTermCtor } = xtermPkg;
+const { FitAddon: FitAddonCtor } = addonFitPkg;
 import { fancyDarkTheme } from "../theme";
 import { useTerminalFit } from "./use-terminal-fit";
 import { providerRead, providerWrite, readDataTransfer, resolveClipboard } from "../clipboard";
@@ -119,7 +139,7 @@ export function useTerminal(
     if (!el) return;
     const o = optsRef.current;
 
-    const term = new XTerm({
+    const term = new XTermCtor({
       theme: o.theme ?? fancyDarkTheme,
       // Only pass rows/cols when explicitly set. xterm validates these and
       // console-errors "rows/cols must be numeric" if handed `undefined`, rather
@@ -134,7 +154,7 @@ export function useTerminal(
       scrollback: o.scrollback ?? 1000,
       allowProposedApi: true,
     });
-    const fitAddon = new FitAddon();
+    const fitAddon = new FitAddonCtor();
     term.loadAddon(fitAddon);
     term.open(el);
     xtermRef.current = term;
