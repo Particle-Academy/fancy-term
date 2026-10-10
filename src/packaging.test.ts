@@ -95,9 +95,19 @@ describe("third-party peer ranges are bounded at the version we build against", 
 });
 
 describe("the stylesheet is loadable without naming xterm", () => {
-    it("is exported as ./xterm.css and shipped in the tarball", () => {
+    it("is exported under the kit's own convention and shipped in the tarball", () => {
+        // `<pkg>/styles.css` is what every other styled package in the kit
+        // exports — fancy-code, fancy-whiteboard, fancy-artboard, fancy-sheets
+        // and fancy-slides, unanimously. A consumer who knows the kit will type
+        // that name, so it has to resolve here too; 0.6.0 shipped only the
+        // descriptive one and would have given them a resolve error.
+        expect(exports_["./styles.css"]).toBe("./xterm.css");
         expect(exports_["./xterm.css"]).toBe("./xterm.css");
         expect(pkg.files).toContain("xterm.css");
+    });
+
+    it("serves ONE file under both names, so they cannot drift apart", () => {
+        expect(exports_["./styles.css"]).toBe(exports_["./xterm.css"]);
     });
 
     it("RE-EXPORTS xterm's stylesheet rather than vendoring a copy of it", () => {

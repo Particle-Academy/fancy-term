@@ -14,6 +14,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## 0.6.1 — 2026-10-10
+
+### Added
+
+- **`@particle-academy/fancy-term/styles.css`** — the same stylesheet under the
+  name the rest of the kit uses.
+
+  0.6.0 shipped the re-export as `/xterm.css` only, which was descriptive but
+  wrong by convention: `fancy-code`, `fancy-whiteboard`, `fancy-artboard`,
+  `fancy-sheets` and `fancy-slides` **all** export `./styles.css`, unanimously.
+  A consumer who knows the kit types that name, and in 0.6.0 they got a resolve
+  error. Both names now serve the one file, and a test asserts they cannot drift
+  apart.
+
+  Use whichever reads better — `/styles.css` for consistency with the rest of
+  your Fancy imports, `/xterm.css` if you would rather the import said what it
+  actually is. Nothing to change if you are already on `/xterm.css`.
+
 ## 0.6.0 — 2026-10-10
 
 ### Added
