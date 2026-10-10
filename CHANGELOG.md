@@ -14,6 +14,66 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## 0.6.0 — 2026-10-10
+
+### Added
+
+- **`@particle-academy/fancy-term/xterm.css` — load the stylesheet without naming xterm.**
+
+  ```ts
+  import "@particle-academy/fancy-term/xterm.css";
+  ```
+
+  The terminal has never rendered without xterm's stylesheet, so every consumer
+  had to write `import "@xterm/xterm/css/xterm.css"` in their own source — which
+  made xterm the one third-party package a Fancy-only app still had to name.
+
+  **Nothing to do.** The old import is identical in effect and still works; this
+  is an additional way in, not a replacement. The new subpath is an `@import` of
+  xterm's own stylesheet rather than a copy of it, so it resolves to the single
+  copy already in your tree and there is no vendored third-party file to drift.
+
+### Changed
+
+- **The `@xterm/*` peer ranges are now bounded above** — `@xterm/xterm` moves
+  from `>=5.0.0` to `>=5.0.0 <6`, and `@xterm/addon-fit` from `>=0.10.0` to
+  `>=0.10.0 <0.11`.
+
+  **This was live, not theoretical.** `@xterm/xterm@6.0.0` and
+  `@xterm/addon-fit@0.11.0` are both `latest` on npm as of today, so the old
+  ranges admitted a MAJOR this package has never been built against — and
+  nothing reported it, because a resolver quietly picking an untested version
+  looks exactly like success. The pairing made it worse rather than safer:
+  `addon-fit@0.10.0` declares `peerDependencies: {"@xterm/xterm": "^5.0.0"}` and
+  accidentally held the line, while **`0.11.0` declares no peer at all** — so
+  `>=0.10.0` plus `>=5.0.0` allowed xterm 6 with addon-fit 0.11, an untested
+  combination, silently.
+
+  **What you must do: almost certainly nothing.** If you are on xterm 5.x and
+  addon-fit 0.10.x — what `npm install` has been resolving all along, and what
+  this package is built and tested against — the range still admits your
+  version and the upgrade is invisible. **If you have explicitly moved to xterm
+  6 or addon-fit 0.11, this release will now fail at install with a peer
+  conflict instead of running untested code.** That is the intended behaviour:
+  it turns a silent runtime risk into a loud install-time error. Tell us and we
+  will qualify 6 properly — widening a range later is safe by construction,
+  since it only ever adds candidates.
+
+  `>=X <2.0` remains correct for a *first-party* sibling, where we cut the
+  releases and the upper bound is a promise we keep. On third-party it is a
+  promise someone else makes.
+
+- **xterm stays a PEER deliberately, and this is the release that writes down
+  why.** `<Terminal>` hands the live `XTerm` instance to the consumer through
+  `handle.xterm`, `handle.ready` and `onReady(xterm)` — the same reason a React
+  component cannot own its copy of React. If this package owned xterm, a
+  consumer on a different version would get two copies and addons and
+  `instanceof` would operate on the wrong class with no warning. The peer's
+  value is not "one copy", it is that a conflict fails loudly at install. The
+  reasoning now sits in the README, in `src/index.ts`, in `xterm.css` and in
+  `src/packaging.test.ts`, so the next person who proposes tidying it into
+  `dependencies` meets the argument first.
+
 ### Fixed
 
 - **`CHANGELOG.md` is now in the published tarball.** `files` did not whitelist it, so npm never shipped it — and this package puts breaking changes in MINOR releases and tells you in the README to read the entry before taking one. The instruction existed for the author, who has the file, and not for the consumer, who is the only one being instructed. Nothing for you to do; the file simply arrives from this release on.

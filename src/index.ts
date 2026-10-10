@@ -59,5 +59,16 @@ export type {
   ShellProfile,
 } from "./types";
 
-// NOTE — xterm.js styles are required for the terminal to render. Import them
-// once in your app: `import "@xterm/xterm/css/xterm.css";`
+// NOTE — the terminal does not render without xterm's stylesheet (its
+// character-measurement helper must stay out of layout, or the cell size comes
+// out wrong). Import it once in your app, from here rather than from xterm:
+//
+//     import "@particle-academy/fancy-term/xterm.css";
+//
+// That re-exports xterm's own stylesheet via `@import`, so it still resolves to
+// the single copy in your tree — xterm stays a PEER on purpose, because
+// <Terminal> hands the live XTerm instance out through `handle.xterm`,
+// `handle.ready` and `onReady`, and a second copy would break addons and
+// `instanceof` silently. `import "@xterm/xterm/css/xterm.css"` still works and
+// is identical in effect; the subpath exists so a Fancy-only app has no reason
+// to name a third-party package in its own source.

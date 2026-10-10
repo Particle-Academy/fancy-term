@@ -34,11 +34,28 @@ npm install @particle-academy/fancy-term @xterm/xterm @xterm/addon-fit
 
 `react`, `xterm`, and the fit addon are **peer dependencies** — the wrapper itself
 is zero-runtime-dep (the same posture as `fancy-echarts` over ECharts). Import the
-xterm stylesheet once in your app:
+stylesheet once in your app, from here rather than from xterm:
 
 ```ts
-import "@xterm/xterm/css/xterm.css";
+import "@particle-academy/fancy-term/xterm.css";
 ```
+
+Without it the terminal does not render: xterm's character-measurement helper
+has to stay out of layout, and without these rules it does not, so the cell size
+comes out wrong.
+
+That subpath re-exports xterm's own stylesheet with `@import`, so it resolves to
+the single copy already in your tree. `import "@xterm/xterm/css/xterm.css"` is
+identical in effect and still works — the subpath exists so a Fancy-only app has
+no reason to name a third-party package in its own source.
+
+**Why xterm is a peer and not a dependency**, since it is the obvious thing to
+"tidy": `<Terminal>` hands you the live `XTerm` instance — `handle.xterm`,
+`handle.ready`, `onReady(xterm)` — exactly as a React component hands out React
+elements and therefore cannot own React. If this package owned its own xterm
+copy, a consumer on a different version would get two, and addons and
+`instanceof` would operate on the wrong class with no warning anywhere. The peer
+turns that silent runtime break into a loud install-time error.
 
 ## `<Terminal>`
 

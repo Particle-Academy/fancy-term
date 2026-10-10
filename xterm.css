@@ -1,0 +1,28 @@
+/**
+ * @particle-academy/fancy-term/xterm.css
+ *
+ * The stylesheet <Terminal> needs, loadable without naming xterm.
+ *
+ *     import "@particle-academy/fancy-term/xterm.css";
+ *
+ * xterm.js does not render without its own stylesheet — its character-measurement
+ * helper is absolutely positioned, so without these rules it participates in
+ * layout and the terminal computes a wrong cell size. Every consumer therefore
+ * had to write `import "@xterm/xterm/css/xterm.css"` in their own source, which
+ * made xterm the one third-party package a Fancy-only app still had to name.
+ *
+ * This is an @import, deliberately, NOT a copy of xterm's stylesheet:
+ *
+ *   • It resolves from the CONSUMER's tree, where the peer is installed — so
+ *     there is still exactly one xterm, which is the whole reason xterm is a
+ *     peer rather than a dependency (<Terminal> hands the live XTerm instance
+ *     out through `handle.xterm` / `handle.ready` / `onReady`, so a second copy
+ *     would silently break addons and `instanceof`).
+ *   • A vendored copy would drift from the xterm version actually installed,
+ *     and would make us a redistributor of a third-party file.
+ *
+ * `src/packaging.test.ts` pins it: with comments stripped, this file must be
+ * EXACTLY the one @import below and nothing else. So do not add a rule here —
+ * app-level overrides belong in the app, where they can be seen.
+ */
+@import "@xterm/xterm/css/xterm.css";
