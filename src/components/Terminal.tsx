@@ -60,6 +60,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     copyPaste,
     onReady,
     onPaste,
+    onLinkActivate,
     contextMenu,
     className,
     style,
@@ -107,6 +108,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Termi
     copyPaste,
     onReady,
     onPaste,
+    onLinkActivate,
   });
 
   // Delegate `xterm` / `ready` as live getters rather than spreading `handle`

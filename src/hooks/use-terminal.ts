@@ -26,6 +26,7 @@ import { useTerminalFit } from "./use-terminal-fit";
 import { providerRead, providerWrite, readDataTransfer, resolveClipboard } from "../clipboard";
 import { copyPasteBehavior, resolveKeyAction } from "../copy-paste-mode";
 import { registerOsc52 } from "../osc52";
+import { urlLinkProvider } from "../links";
 import type { TerminalHandle, TerminalOptions } from "../types";
 
 const DEFAULT_FONT =
@@ -205,6 +206,20 @@ export function useTerminal(
       },
     );
 
+    // Clickable http(s) URLs — only while the host has an `onLinkActivate`. One
+    // provider for the terminal's life that reads the CURRENT handler, so adding,
+    // changing or removing it never rebuilds the terminal. fancy-term opens
+    // nothing itself: with no handler there are no links, and no underline that
+    // promises a click which does nothing.
+    const linkDisposable = term.registerLinkProvider({
+      provideLinks(bufferLineNumber, callback) {
+        if (!optsRef.current.onLinkActivate) return callback(undefined);
+        urlLinkProvider(term, {
+          onActivate: (url, event) => optsRef.current.onLinkActivate?.(url, event),
+        }).provideLinks(bufferLineNumber, callback);
+      },
+    });
+
     // linux mode: auto-copy the selection as it changes (X11 primary-selection).
     const selectionSub = term.onSelectionChange(() => {
       const oo = optsRef.current;
@@ -256,6 +271,7 @@ export function useTerminal(
       el.removeEventListener("paste", onPasteEvent, true);
       el.removeEventListener("mousedown", onMouseDown);
       oscDisposable?.dispose();
+      linkDisposable.dispose();
       selectionSub.dispose();
       dataSub.dispose();
       resizeSub.dispose();

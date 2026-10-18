@@ -28,6 +28,11 @@ export type { ClipboardPayload, ClipboardProvider, ClipboardOption } from "./cli
 export { parseOsc52, encodeBase64, decodeBase64, osc52Response, registerOsc52 } from "./osc52";
 export type { Osc52Mode, Osc52Request } from "./osc52";
 
+// Clickable URLs — pure detection + an xterm link provider, for hosts wiring
+// their own xterm (the <Terminal> prop is `onLinkActivate`)
+export { findUrls, urlLinkProvider, registerUrlLinks } from "./links";
+export type { UrlMatch, UrlLinkOptions } from "./links";
+
 // Copy/paste UX modes — pure decision helpers
 export { copyPasteBehavior, resolveKeyAction } from "./copy-paste-mode";
 export type { CopyPasteMode, CopyPasteBehavior, KeyEventLike } from "./copy-paste-mode";

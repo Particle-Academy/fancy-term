@@ -14,6 +14,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## 0.7.0 — 2026-10-18
+
+### Added
+
+- **Clickable URLs: `<Terminal onLinkActivate={(url, event) => …}>`.** http(s)
+  URLs in the output are underlined on hover with a pointer cursor, and a click
+  calls your handler with the URL. **fancy-term opens nothing itself** — what a
+  click does is yours (Genie 2 opens http(s) with its shell). Without the prop,
+  URLs are plain text as before.
+
+  - A URL that **wraps across rows is one link**, clickable on any of its rows.
+  - The sentence's punctuation is left out (`see https://example.com.` links
+    `https://example.com`); a closing bracket the URL itself opened is kept
+    (`…/wiki/Foo_(bar)`). Only `http:` and `https:` — never `file:`,
+    `javascript:` or other schemes.
+  - Positions come from the terminal's **cells**, not string indices, so links
+    stay put after wide characters (CJK, emoji), and a wide character inside a
+    URL (an internationalised host) does not split it.
+  - The handler is read live: adding, changing or removing it never rebuilds
+    the terminal.
+
+  For hosts wiring their own xterm: `findUrls(text)` (pure), `urlLinkProvider(xterm, { onActivate })`
+  and `registerUrlLinks(xterm, …)` (returns a disposable).
+
+  Built on xterm's core link-provider API — no new dependency (the official
+  web-links addon is a separate third-party package). Tested against a real xterm
+  buffer, wrapping included.
+
+  Asked for by Genie 2 (Tynn #763) for parity with Genie 1's clickable terminal links.
+
+**What you must DO: nothing.** The prop is optional.
+
 ## 0.6.2 — 2026-10-10
 
 ### Fixed

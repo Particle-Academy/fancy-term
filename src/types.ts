@@ -149,6 +149,14 @@ export interface TerminalOptions {
    * default text paste — e.g. to transform it, then call `handle.paste(...)`).
    */
   onPaste?: (payload: ClipboardPayload) => void | boolean;
+  /**
+   * Makes http(s) URLs in the output clickable — underlined on hover, with a
+   * pointer cursor — and calls this with the URL on click. A URL that wraps
+   * across rows is one link. **fancy-term opens nothing itself**: what a click
+   * does (open a browser, a panel, nothing) is the host's decision. Omit it and
+   * URLs are plain text, as before.
+   */
+  onLinkActivate?: (url: string, event: MouseEvent) => void;
 }
 
 export interface TerminalProps extends TerminalOptions, Omit<HTMLAttributes<HTMLDivElement>, "onInput" | "onResize" | "onPaste" | "contextMenu" | "children"> {
