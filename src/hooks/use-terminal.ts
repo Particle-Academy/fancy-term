@@ -26,7 +26,7 @@ import { useTerminalFit } from "./use-terminal-fit";
 import { providerRead, providerWrite, readDataTransfer, resolveClipboard } from "../clipboard";
 import { copyPasteBehavior, resolveKeyAction } from "../copy-paste-mode";
 import { registerOsc52 } from "../osc52";
-import { urlLinkProvider } from "../links";
+import { resolveLinkHandlers, terminalLinkProvider } from "../links";
 import type { TerminalHandle, TerminalOptions } from "../types";
 
 const DEFAULT_FONT =
@@ -206,17 +206,18 @@ export function useTerminal(
       },
     );
 
-    // Clickable http(s) URLs — only while the host has an `onLinkActivate`. One
-    // provider for the terminal's life that reads the CURRENT handler, so adding,
-    // changing or removing it never rebuilds the terminal. fancy-term opens
-    // nothing itself: with no handler there are no links, and no underline that
-    // promises a click which does nothing.
+    // Clickable URLs and file paths, sent wherever the host's `links` config says
+    // (`onLinkActivate` is 0.7.0's shorthand for `links.url`). One provider for the
+    // terminal's life that resolves the CURRENT config on every hover, so changing
+    // it never rebuilds the terminal. With nothing configured there are no links,
+    // and no underline promising a click that does nothing.
     const linkDisposable = term.registerLinkProvider({
       provideLinks(bufferLineNumber, callback) {
-        if (!optsRef.current.onLinkActivate) return callback(undefined);
-        urlLinkProvider(term, {
-          onActivate: (url, event) => optsRef.current.onLinkActivate?.(url, event),
-        }).provideLinks(bufferLineNumber, callback);
+        const oo = optsRef.current;
+        const links = oo.links?.url === undefined && oo.onLinkActivate
+          ? { ...oo.links, url: oo.onLinkActivate }
+          : oo.links;
+        terminalLinkProvider(term, resolveLinkHandlers(links)).provideLinks(bufferLineNumber, callback);
       },
     });
 

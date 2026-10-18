@@ -3,6 +3,7 @@ import type { ITheme, Terminal as XTerm } from "@xterm/xterm";
 import type { ClipboardOption, ClipboardPayload } from "./clipboard";
 import type { CopyPasteMode } from "./copy-paste-mode";
 import type { Osc52Mode } from "./osc52";
+import type { TerminalLinks } from "./links";
 import type { TerminalContextMenuConfig } from "./context-menu";
 
 /** xterm.js color theme (re-exported for ergonomic typing). */
@@ -157,6 +158,26 @@ export interface TerminalOptions {
    * URLs are plain text, as before.
    */
   onLinkActivate?: (url: string, event: MouseEvent) => void;
+  /**
+   * Which links are clickable, and where each kind of click goes — the
+   * developer's choice, per kind:
+   *
+   * ```tsx
+   * links={{
+   *   url: "browser",                 // or "none", or (url, event) => …
+   *   file: "vscode",                 // "cursor" | "windsurf" | "vscode-insiders" | "none"
+   *                                   // | { template: "https://github.com/o/r/blob/main/{path}#L{line}" }
+   *                                   // | (file, event) => openInMyViewer(file.absolutePath, file.line)
+   *   root: "/home/me/project",       // the shell's cwd, to resolve relative paths
+   * }}
+   * ```
+   *
+   * File links cover compiler, test and stack-trace output — `src/a.ts:42:7`,
+   * `C:\x\a.cs(12,5)` — and are linked only with a directory part or a line
+   * number, so ordinary words are never underlined. Omit `links` (and
+   * `onLinkActivate`) and nothing is linked. `links.url` wins over `onLinkActivate`.
+   */
+  links?: TerminalLinks;
 }
 
 export interface TerminalProps extends TerminalOptions, Omit<HTMLAttributes<HTMLDivElement>, "onInput" | "onResize" | "onPaste" | "contextMenu" | "children"> {

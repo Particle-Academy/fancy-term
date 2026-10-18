@@ -30,8 +30,27 @@ export type { Osc52Mode, Osc52Request } from "./osc52";
 
 // Clickable URLs — pure detection + an xterm link provider, for hosts wiring
 // their own xterm (the <Terminal> prop is `onLinkActivate`)
-export { findUrls, urlLinkProvider, registerUrlLinks } from "./links";
-export type { UrlMatch, UrlLinkOptions } from "./links";
+export {
+  findUrls,
+  findFilePaths,
+  urlLinkProvider,
+  registerUrlLinks,
+  terminalLinkProvider,
+  resolveLinkHandlers,
+  resolveFilePath,
+  fileLinkUrl,
+  openExternal,
+} from "./links";
+export type {
+  UrlMatch,
+  UrlLinkOptions,
+  FileMatch,
+  FileLink,
+  TerminalLinkOptions,
+  TerminalLinks,
+  UrlLinkTarget,
+  FileLinkTarget,
+} from "./links";
 
 // Copy/paste UX modes — pure decision helpers
 export { copyPasteBehavior, resolveKeyAction } from "./copy-paste-mode";

@@ -14,6 +14,50 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## 0.8.0 — 2026-10-18
+
+### Added
+
+- **File paths are clickable too, and the developer chooses where every click
+  goes** — the `links` prop:
+
+  ```tsx
+  <Terminal links={{
+    url: "browser",                        // or "none", or (url, event) => …
+    file: "vscode",                        // "cursor" | "windsurf" | "vscode-insiders" | "none"
+                                           // | { template: "https://github.com/o/r/blob/main/{path}#L{line}" }
+                                           // | (file, event) => openInMyUi(file.absolutePath, file.line)
+    root: "/home/me/project",              // the shell's cwd: resolves relative paths
+  }} />
+  ```
+
+  - **File links** cover compiler, test-runner and stack-trace output —
+    `src/app.ts:42:7`, `./x.mjs`, `/usr/lib/a.so`, `C:\work\a.ts:12:4`,
+    `Program.cs(12,5)` — and carry the line and column to wherever they go.
+  - **No false underlines**: a path is linked only with a directory part or a
+    line number, so `package.json`, `e.g.`, `and/or`, `1.2.3` and email
+    addresses in prose stay plain text. A path inside a URL is never a second link.
+  - **Destinations**: an installed editor through its URL scheme
+    (`vscode://file/…:line:col`, matching VS Code's documented form; `root` needed
+    for relative paths), a `{ template }` with `{path}`, `{slashPath}`, `{line}`,
+    `{column}` for any other editor or a code host, your own function (it gets
+    `absolutePath` when `root` is set) for internal UI, or `"none"`. `url:
+    "browser"` opens a new tab with `noopener`.
+  - Each kind is linked only when configured — no underline that promises a
+    click which does nothing. The config is read live; changing it never
+    rebuilds the terminal.
+
+  Pure helpers for hosts wiring their own xterm: `findFilePaths`,
+  `resolveFilePath`, `fileLinkUrl`, `resolveLinkHandlers`, `terminalLinkProvider`,
+  `openExternal`.
+
+  Asked for by the owner: "links to files need to be clickable as well", and
+  "dev should be able to choose where those clicks go — installed file editor,
+  browser, or handle them internally".
+
+**What you must DO: nothing.** `onLinkActivate` from 0.7.0 still works — it is
+the shorthand for `links.url`, and `links.url` wins when both are set.
+
 ## 0.7.0 — 2026-10-18
 
 ### Added
