@@ -18,22 +18,16 @@
  * Reported by `claude · genie2`, whose SSR render tests died at import. Fixed in
  * 0.6.2 by importing the default and destructuring.
  *
- * WHAT THIS DELIBERATELY DOES NOT GUARD — and why `self` is stubbed below:
+ * HISTORY — this script used to stub `globalThis.self`:
  *
  * `@xterm/addon-fit` is a UMD bundle whose wrapper references `self`, so it
- * throws `ReferenceError: self is not defined` when EVALUATED in Node, no matter
- * how we import it. Measured:
- *
- *   import('@xterm/xterm')      -> OK
- *   import('@xterm/addon-fit')  -> ReferenceError: self is not defined
- *
- * That is upstream packaging, not our import style, and the two failures are
- * easy to conflate — the first attempt at this script did. Stubbing `self`
- * isolates the thing we control. It is NOT a claim that this package is
- * SSR-safe: a server render that evaluates the module graph still loads
- * addon-fit and still dies. Making it genuinely SSR-safe means loading
- * addon-fit lazily at mount, which is a design change, not a packaging fix, and
- * is written up rather than smuggled in here.
+ * throws `ReferenceError: self is not defined` when EVALUATED in Node. Up to
+ * 0.8.0 it was imported at module top level, so this script stubbed `self` to
+ * isolate the named-export defect above. That stub is how the package shipped
+ * SSR-unsafe: production SSR crashed while this check stayed green. Since 0.8.1
+ * xterm loads lazily at mount (src/xterm-loader.ts), the stub is gone, and
+ * scripts/check-ssr-import.mjs asserts the SSR contract (ESM + CJS, no DOM,
+ * renderToString) directly.
  *
  * Exits non-zero on failure, and non-zero (never "skip") when dist is missing —
  * a check that quietly passes because it had nothing to look at is worse than no
@@ -42,9 +36,6 @@
 import { existsSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-// See the header: isolates addon-fit's browser-only UMD preamble from the thing
-// under test, which is whether OUR import statements load under Node.
-globalThis.self = globalThis;
 
 const dist = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 

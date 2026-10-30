@@ -11,38 +11,26 @@ import { Terminal } from "@particle-academy/fancy-term";
 import "@particle-academy/fancy-term/styles.css";
 ```
 
-### This package is CLIENT-ONLY. Load it dynamically for SSR.
+### Server rendering (SSR)
 
-**Importing it at module scope on a server throws**, before any component runs:
+**Since 0.8.1 the package is safe to import and render on a server.** xterm.js
+and `@xterm/addon-fit` are loaded lazily inside the client-only mount effect, so
+nothing browser-only is evaluated at import. On the server `<Terminal>` renders
+an empty `data-fancy-terminal` container (with your `data-*`, `aria-*`, class and
+style props) — the same element the client renders before xterm mounts, so
+hydration matches. No `lazy()` / client-only wrapper is needed.
 
-```
-ReferenceError: self is not defined
-```
+Up to 0.8.0 the import itself threw `ReferenceError: self is not defined`
+(addon-fit's UMD wrapper reads the browser `self` global). If you saw that,
+upgrade; you can drop any `clientOnly` workaround you added for it.
 
-Measured, so you do not have to guess which dependency:
-
-| import, in plain Node | result |
-|---|---|
-| `@xterm/xterm` | loads |
-| **`@xterm/addon-fit`** | **`ReferenceError: self is not defined`** |
-
-`@xterm/addon-fit` is a UMD bundle whose wrapper references `self`, a browser
-global. That is upstream packaging, not an interop problem a CommonJS entry
-would fix — the module simply cannot be *evaluated* outside a browser.
-
-So in an SSR app, reach it only from a dynamically imported, client-side path:
-
-```tsx
-const TerminalPanel = lazy(async () => {
-  const { Terminal } = await import("@particle-academy/fancy-term");
-  await import("@particle-academy/fancy-term/styles.css");
-  return { default: () => <Terminal output={out} onData={send} /> };
-});
-```
-
-Any `clientOnly`-style wrapper does the same job; the requirement is that the
-server's render never reaches the import. A bundler that code-splits on
-`import()` keeps it out of the server bundle for you.
+**The handle before `ready`:** xterm arrives a tick after mount. Calls made in
+that window to `write`, `writeln`, `clear`, `reset`, `focus` and `paste` are
+queued and replayed in order; reads (`getBuffer`, `getSelection`) return empty
+and `fit` / `selectAll` / `clearSelection` are no-ops. `await handle.ready` (or
+use `onReady`) before reading. Guarded by `scripts/check-ssr-import.mjs`, which
+imports the built ESM and CJS bundles in plain Node with no DOM and server
+renders `<Terminal>` on every `npm test`.
 
 **A separate thing that WAS ours, fixed in 0.6.2:** the ESM bundle used to emit
 `import { Terminal } from "@xterm/xterm"`, and because that package is

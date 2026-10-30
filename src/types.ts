@@ -36,6 +36,14 @@ export interface ShellProfile {
  * Imperative handle exposed via the `<Terminal>` ref and returned by
  * {@link useTerminal}. The same surface an MCP bridge drives so an embedded
  * agent reads the buffer + writes input without DOM-scraping.
+ *
+ * **Before `ready`.** xterm.js is loaded lazily on the client after mount (so the
+ * package is safe to import and render on a server), which leaves a short window
+ * where `xterm` is null. During it, `write` / `writeln` / `clear` / `reset` /
+ * `focus` / `paste` are QUEUED and replayed in order once xterm opens; the reads
+ * (`getBuffer`, `getSelection`, `copySelection`) return their empty values and
+ * `fit` / `selectAll` / `clearSelection` are no-ops. Before the first mount and
+ * after unmount every method is a no-op. `await handle.ready` to read reliably.
  */
 export interface TerminalHandle {
   /** The underlying xterm.js instance — escape hatch for addons / advanced use. Null before mount. */

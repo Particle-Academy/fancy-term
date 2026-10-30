@@ -1,6 +1,10 @@
-// xterm's addon UMD shim references the browser `self` global at module-load.
-// We only server-render (no real terminal mounts in tests), so a minimal stub is
-// enough to let the modules import under vitest's node environment.
-const g = globalThis as Record<string, unknown>;
-if (typeof g.self === "undefined") g.self = globalThis;
-if (typeof g.window === "undefined") g.window = globalThis;
+// Intentionally NO browser-global stubs here.
+//
+// Up to 0.8.0 this file set `globalThis.self` and `globalThis.window` so the
+// package could be imported under the node environment at all — which hid the
+// fact that importing it on a real server threw `ReferenceError: self is not
+// defined` (xterm's addon UMD preamble). The suite stayed green while every
+// Inertia SSR page that bundled <Terminal> crashed in production. Node-env tests
+// must see exactly what a server sees; DOM tests opt into jsdom per file with
+// `// @vitest-environment jsdom`.
+export {};

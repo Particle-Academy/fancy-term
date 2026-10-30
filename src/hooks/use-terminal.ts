@@ -1,26 +1,13 @@
 import { useEffect, useRef, type RefObject } from "react";
-// `@xterm/xterm` and `@xterm/addon-fit` are CommonJS-ONLY, and their exports are
-// not statically detectable by Node's cjs-module-lexer. A named import here
-// becomes `import { Terminal } from '@xterm/xterm'` in the ESM bundle, which
-// throws `SyntaxError: Named export 'Terminal' not found` the moment anyone
-// imports this package WITHOUT a bundler — SSR, a react-dom/server render test,
-// a plain Node script. Vite's interop hides it, which is why the component
-// works in an app and why this shipped in 0.6.1 unnoticed.
-//
-// A DEFAULT import is the fix: for a CJS module Node binds `default` to
-// `module.exports`, so destructuring off it works under both Node and every
-// bundler. Types come from a separate `import type`, which is erased.
-//
-// Guarded two ways: `src/packaging.test.ts` forbids a bare named import from
-// these peers, and `scripts/check-esm-import.mjs` imports the built bundle in a
-// real Node process — vitest runs through Vite and CANNOT see this defect.
-import xtermPkg from "@xterm/xterm";
-import addonFitPkg from "@xterm/addon-fit";
+// xterm and its addons are NEVER imported at module top level — only as types
+// (erased). They are loaded lazily by `../xterm-loader` from inside the mount
+// effect, which never runs on a server: the addon UMD bundles read `self` when
+// evaluated, so a top-level import made this package throw
+// `ReferenceError: self is not defined` on SSR (0.8.0 and earlier). See
+// xterm-loader.ts for the CommonJS named-export interop it also handles.
 import type { Terminal as XTerm } from "@xterm/xterm";
 import type { FitAddon } from "@xterm/addon-fit";
-
-const { Terminal: XTermCtor } = xtermPkg;
-const { FitAddon: FitAddonCtor } = addonFitPkg;
+import { loadedXterm, loadXterm, type XtermModules } from "../xterm-loader";
 import { fancyDarkTheme } from "../theme";
 import { useTerminalFit } from "./use-terminal-fit";
 import { providerRead, providerWrite, readDataTransfer, resolveClipboard } from "../clipboard";
@@ -72,6 +59,18 @@ export function useTerminal(
   // A re-armable "xterm is open" promise backing handle.ready.
   const readyRef = useRef(makeDeferred<XTerm>());
 
+  // Buffer-mutating calls made while xterm is still loading (between the mount
+  // effect starting and the lazily-imported xterm opening). Replayed in order on
+  // open, so a parent effect that writes right after mount — or the controlled
+  // `output` prop — is never lost. `null` when not mounting: before the first
+  // mount effect and after unmount these calls are no-ops, as they always were.
+  const pendingRef = useRef<Array<(t: XTerm) => void> | null>(null);
+  const run = (op: (t: XTerm) => void): void => {
+    const t = xtermRef.current;
+    if (t) op(t);
+    else pendingRef.current?.push(op);
+  };
+
   // Stable handle — its methods always operate on the live xterm via the ref.
   const handleRef = useRef<TerminalHandle | null>(null);
   if (handleRef.current === null) {
@@ -82,10 +81,10 @@ export function useTerminal(
       get ready() {
         return readyRef.current.promise;
       },
-      write: (d) => xtermRef.current?.write(d),
-      writeln: (d) => xtermRef.current?.writeln(d),
-      clear: () => xtermRef.current?.clear(),
-      reset: () => xtermRef.current?.reset(),
+      write: (d) => run((t) => t.write(d)),
+      writeln: (d) => run((t) => t.writeln(d)),
+      clear: () => run((t) => t.clear()),
+      reset: () => run((t) => t.reset()),
       fit: () => {
         const addon = fitRef.current;
         if (!addon) return;
@@ -111,7 +110,7 @@ export function useTerminal(
           /* container not measurable yet — ignore */
         }
       },
-      focus: () => xtermRef.current?.focus(),
+      focus: () => run((t) => t.focus()),
       getBuffer: () => readBuffer(xtermRef.current),
       getSelection: () => xtermRef.current?.getSelection() ?? "",
       copySelection: async () => {
@@ -121,7 +120,7 @@ export function useTerminal(
       },
       paste: async (text) => {
         const data = text ?? (await providerRead(resolveClipboard(optsRef.current.clipboard).provider));
-        if (data) xtermRef.current?.paste(data);
+        if (data) run((t) => t.paste(data));
       },
       selectAll: () => xtermRef.current?.selectAll(),
       clearSelection: () => xtermRef.current?.clearSelection(),
@@ -134,10 +133,39 @@ export function useTerminal(
   }
   const handle = handleRef.current;
 
-  // Create the engine once for the container.
+  // Create the engine once for the container. xterm is imported lazily here —
+  // the first mount waits a tick for the module; later mounts open synchronously
+  // from the cache. Server renders never reach this effect.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    if (pendingRef.current === null) pendingRef.current = [];
+
+    let cancelled = false;
+    let teardown: (() => void) | undefined;
+    const mount = (mods: XtermModules) => {
+      if (!cancelled) teardown = openTerminal(el, mods);
+    };
+    const cached = loadedXterm();
+    if (cached) {
+      mount(cached);
+    } else {
+      loadXterm().then(mount, (err: unknown) => {
+        if (!cancelled) console.error("[fancy-term] could not load @xterm/xterm / @xterm/addon-fit", err);
+      });
+    }
+
+    return () => {
+      cancelled = true;
+      // Cancelled before xterm loaded (unmount, or StrictMode's dev double-run):
+      // nothing was opened, so keep the pending queue and the un-resolved ready
+      // promise for the re-run rather than orphaning a consumer's `await ready`.
+      teardown?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [containerRef]);
+
+  function openTerminal(el: HTMLElement, { Terminal: XTermCtor, FitAddon: FitAddonCtor }: XtermModules): () => void {
     const o = optsRef.current;
 
     const term = new XTermCtor({
@@ -268,6 +296,11 @@ export function useTerminal(
     optsRef.current.onReady?.(term);
     readyRef.current.resolve(term);
 
+    // Replay calls made while xterm was loading, in order, then stop queueing.
+    const pending = pendingRef.current ?? [];
+    pendingRef.current = null;
+    for (const op of pending) op(term);
+
     return () => {
       el.removeEventListener("paste", onPasteEvent, true);
       el.removeEventListener("mousedown", onMouseDown);
@@ -282,8 +315,7 @@ export function useTerminal(
       // Re-arm readiness for a potential remount (container change).
       readyRef.current = makeDeferred<XTerm>();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [containerRef]);
+  }
 
   // Re-apply reactive options without tearing the terminal down.
   useEffect(() => {

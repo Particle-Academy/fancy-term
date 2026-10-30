@@ -14,6 +14,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **SSR crash `ReferenceError: self is not defined` when the package is
+  imported on the server.** Consumer action: none — update. Importing
+  `@particle-academy/fancy-term` in Node (Inertia SSR, `react-dom/server`, a
+  plain script) threw at import, in both the ESM and CJS builds, because
+  `@xterm/xterm` and `@xterm/addon-fit` were imported at module top level and
+  addon-fit's UMD wrapper reads the browser-only `self` global. Any SSR page
+  whose bundle reached a `<Terminal>` failed to server-render. xterm and its
+  addon are now loaded lazily inside the client-only mount effect; on the
+  server `<Terminal>` renders the same empty `data-fancy-terminal` container
+  the client renders before xterm mounts, so hydration matches. Public API is
+  unchanged.
+- Because xterm now arrives a tick after the first mount, ref calls made in that
+  window are **queued** rather than dropped: `write`, `writeln`, `clear`,
+  `reset`, `focus` and `paste` replay in order once xterm opens (so a controlled
+  `output` or a parent effect writing straight after mount still lands). Reads
+  (`getBuffer`, `getSelection`, `copySelection`) return their empty values and
+  `fit` / `selectAll` / `clearSelection` are no-ops until `ready` resolves,
+  exactly as before mount previously. `await handle.ready` to read reliably.
+- The test setup no longer stubs `self` / `window` (that stub is why the suite
+  stayed green while production SSR crashed). New guards: an in-suite SSR test,
+  `scripts/check-ssr-import.mjs` (built ESM + CJS in plain Node with no DOM, plus
+  `renderToString`), a packaging rule banning any top-level value import from
+  `@xterm/*`, and jsdom client tests for mount / write / fit. `jsdom` is a new
+  devDependency (on the org third-party allowlist; test-only).
+- `docs/Terminal.md` no longer tells SSR apps to wrap the import in a
+  client-only `lazy()`; that workaround is unnecessary now.
+
 ### Security
 
 - Update Vitest to 4.1.12 for security fixes; dev toolchain only, nothing to do.

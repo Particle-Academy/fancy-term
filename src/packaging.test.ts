@@ -196,6 +196,24 @@ describe("no value import names bindings from a CommonJS-only peer", () => {
         });
     }
 
+    it("no top-level VALUE import of any @xterm package at all (SSR safety)", () => {
+        // 0.8.0 default-imported xterm + addon-fit at module top level; the addon
+        // UMD reads `self` when evaluated, so importing the package on a server
+        // threw `ReferenceError: self is not defined`. xterm is loaded lazily by
+        // src/xterm-loader.ts via `import()` inside the client-only mount effect.
+        // Default, namespace, named and bare side-effect imports are all banned;
+        // `import type` is erased and allowed.
+        const offenders: string[] = [];
+        for (const file of files) {
+            for (const line of linesOf(file)) {
+                if (/^\s*import\s+(?!type\b)/.test(line) && /["']@xterm\//.test(line)) {
+                    offenders.push(`${file.split("/").slice(-2).join("/")}: ${line.trim()}`);
+                }
+            }
+        }
+        expect(offenders, "load xterm lazily via src/xterm-loader.ts").toEqual([]);
+    });
+
     it("still ALLOWS type-only imports, which are erased at build time", () => {
         // Scoped so the rule does not argue with people: types.ts and osc52.ts
         // legitimately `import type` from these peers, and must keep working.
