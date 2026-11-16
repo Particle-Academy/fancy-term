@@ -7,7 +7,7 @@
 embedded agents read the buffer, write input, and run commands **without
 DOM-scraping**.
 
-Like every Fancy UI component it serves two surfaces at once:
+Like every Fancy Dev Kit component it serves two surfaces at once:
 
 - **Authoring** — terse and controlled (`output` + `onData`), JSON-friendly props
   (rows/cols, theme tokens, initial buffer), a stable `data-fancy-terminal`
@@ -342,7 +342,7 @@ MIT
 
 ---
 
-## ⭐ Star Fancy UI
+## ⭐ Star Fancy Dev Kit
 
 If this package is useful to you, a quick ⭐ on the repo really helps us build a better kit. Thank you!
 
